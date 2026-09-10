@@ -18,14 +18,31 @@ export default function PlanList({ selectedPlanId, onSelectPlan }) {
   }
 
   useEffect(() => {
-    refresh();
-    // Realtime: reflect changes made from another device instantly
-    const channel = supabase
-      .channel('workout_plans_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_plans' }, refresh)
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, []);
+  refresh();
+
+  // Each PlanList instance needs its own unique Realtime channel.
+  const channelName =
+    `workout_plans_changes_${crypto.randomUUID()}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'workout_plans',
+      },
+      () => {
+        refresh();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
 
   async function createPlan() {
     const title = window.prompt('Plan name (e.g. "Push Day")');
